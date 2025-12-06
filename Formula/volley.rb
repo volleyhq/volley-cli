@@ -1,30 +1,30 @@
 class Volley < Formula
   desc "Volley CLI - Webhook forwarding for local development"
   homepage "https://github.com/volleyhq/volley-cli"
-  url "https://github.com/volleyhq/volley-cli/archive/refs/tags/v0.1.0.tar.gz"
+  url "https://github.com/volleyhq/volley-cli/archive/refs/tags/v0.1.1.tar.gz"
   sha256 ""
   license "MIT"
-  version "0.1.0"
+  version "0.1.1"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.0/volley-darwin-amd64.tar.gz"
-      sha256 "83bd9d1b9f5d4ed9d6477159e1b2d671ffd6fe57f2415c58a0a19ffe968092d5"
+      url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.1/volley-darwin-amd64.tar.gz"
+      sha256 "047a3511ccfa6ee357cf88ec57c9f4c6a8ae7588b70f26cd03535eace2314257"
     end
     if Hardware::CPU.arm?
-      url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.0/volley-darwin-arm64.tar.gz"
-      sha256 "c490fa15f71cbd8f9ceff8d5ac9f7663253b66d18c2da29a9b908ba3b04bd817"
+      url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.1/volley-darwin-arm64.tar.gz"
+      sha256 "9c5a902c8daf5f07d825fd1dd765e429fe1d95667d448f704e08aae50a101da2"
     end
   end
 
   on_linux do
     if Hardware::CPU.intel?
-      url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.0/volley-linux-amd64.tar.gz"
-      sha256 "23eb48df61dea3f5ab981cc639104ab6f61f4389c809d352c52fd88993961519"
+      url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.1/volley-linux-amd64.tar.gz"
+      sha256 "6b55a94d4d8f5d4f8d7428e7f87db62304b9405bb8fd0fc5a73406b0a9e66450"
     end
     if Hardware::CPU.arm?
-      url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.0/volley-linux-arm64.tar.gz"
-      sha256 "9c08959b167e9345c4806ed50bbd58f9588f231326703b740bdd1be2127230dc"
+      url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.1/volley-linux-arm64.tar.gz"
+      sha256 "027d84c18df44f3e27c4b7ad158b4ffd8847d5325bdcd5d5a579534f5cfb0de1"
     end
   end
 
