@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -190,45 +189,36 @@ func runListen(cmd *cobra.Command, args []string) error {
 func forwardEvent(event *api.Event, targetURL string) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	// Parse the raw body as JSON to forward it
-	var payload map[string]interface{}
-	if err := json.Unmarshal([]byte(event.RawBody), &payload); err != nil {
-		// If not JSON, send as-is
-		payload = map[string]interface{}{
-			"raw": event.RawBody,
-		}
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal payload: %w", err)
-	}
+	// Forward raw body as-is to preserve exact bytes (important for signature verification)
+	// Re-encoding JSON would change the exact bytes and break webhook signatures
+	body := []byte(event.RawBody)
 
 	req, err := http.NewRequest("POST", targetURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Volley-CLI/1.0")
-	req.Header.Set("X-Volley-Event-ID", event.EventID)
-	req.Header.Set("X-Volley-Source-ID", strconv.FormatUint(event.SourceID, 10))
-	req.Header.Set("X-Volley-Source-Slug", event.SourceSlug)
-
-	// Forward original headers if available
+	// Forward original headers first (preserves signature headers like Paddle-Signature)
 	if event.Headers != nil {
 		for key, values := range event.Headers {
-			// Skip Content-Type and User-Agent as we set them explicitly
-			keyLower := key
-			if keyLower == "content-type" || keyLower == "user-agent" {
-				continue
-			}
 			for _, value := range values {
 				req.Header.Add(key, value)
 			}
 		}
 	}
+
+	// Set/override headers (only if not already set from original headers)
+	if req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", "Volley-CLI/1.0")
+	}
+	
+	// Add Volley-specific headers for tracking
+	req.Header.Set("X-Volley-Event-ID", event.EventID)
+	req.Header.Set("X-Volley-Source-ID", strconv.FormatUint(event.SourceID, 10))
+	req.Header.Set("X-Volley-Source-Slug", event.SourceSlug)
 
 	resp, err := client.Do(req)
 	if err != nil {
