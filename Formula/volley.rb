@@ -9,22 +9,22 @@ class Volley < Formula
   on_macos do
     if Hardware::CPU.intel?
       url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.1/volley-darwin-amd64.tar.gz"
-      sha256 "047a3511ccfa6ee357cf88ec57c9f4c6a8ae7588b70f26cd03535eace2314257"
+      sha256 "6bcb155f53e4c7565e6d6efba2ab10213ebfe569bf36d2ddfc6e10caf26148cd"
     end
     if Hardware::CPU.arm?
       url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.1/volley-darwin-arm64.tar.gz"
-      sha256 "9c5a902c8daf5f07d825fd1dd765e429fe1d95667d448f704e08aae50a101da2"
+      sha256 "4d2c146bbb50aec2d579b9d35040e2f4e8a43e19e2590c9327dd86007c5d2815"
     end
   end
 
   on_linux do
     if Hardware::CPU.intel?
       url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.1/volley-linux-amd64.tar.gz"
-      sha256 "6b55a94d4d8f5d4f8d7428e7f87db62304b9405bb8fd0fc5a73406b0a9e66450"
+      sha256 "95915db74708db92f0faaae1113ba51d807df3ecb20bf2d68fa524d9eb0f488b"
     end
     if Hardware::CPU.arm?
       url "https://github.com/volleyhq/volley-cli/releases/download/v0.1.1/volley-linux-arm64.tar.gz"
-      sha256 "027d84c18df44f3e27c4b7ad158b4ffd8847d5325bdcd5d5a579534f5cfb0de1"
+      sha256 "0c78fbbfe8f9acb4bb907b0a907ab8432b9ad698ec691a63db3471e6b970ea3a"
     end
   end
 
