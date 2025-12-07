@@ -288,6 +288,13 @@ make release
 - **Dashboard**: [app.volleyhooks.com](https://app.volleyhooks.com)
 - **Support**: [app.volleyhooks.com/console/help](https://app.volleyhooks.com/console/help)
 
+## Example Repositories
+
+Ready-to-use examples showing how to integrate Volley:
+
+- [volley-stripe-example](https://github.com/volleyhq/volley-stripe-example) - Complete Stripe webhook integration with Express.js
+- [volley-local-dev-example](https://github.com/volleyhq/volley-local-dev-example) - Local development examples in Node.js, Python, and Go
+
 ## Related Projects
 
 - [Volley Platform](https://volleyhooks.com) - The webhook middleware platform
