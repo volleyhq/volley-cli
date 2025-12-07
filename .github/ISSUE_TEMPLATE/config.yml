@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Volley Documentation
+    url: https://docs.volleyhooks.com
+    about: Check our documentation for guides and API reference
+  - name: Volley Support
+    url: https://app.volleyhooks.com/console/help
+    about: Get help from our support team
+  - name: Volley Community
+    url: https://volleyhooks.com/community
+    about: Ask questions and discuss with the community
+
