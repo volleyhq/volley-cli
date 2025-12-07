@@ -10,15 +10,23 @@ Similar to Stripe CLI, Volley CLI allows you to forward webhooks from your Volle
 
 ## What is Volley?
 
-[Volley](https://volleyhooks.com) is a reliable webhook middleware platform that accepts webhooks from any source and dispatches them to your endpoints with guaranteed delivery, rate limiting, and comprehensive monitoring. Perfect for testing webhooks locally, debugging webhook issues, and building production webhook infrastructure.
+[Volley](https://volleyhooks.com) is a **webhook-as-a-service platform** that provides reliable webhook infrastructure for both development and production. Volley accepts webhooks from any source and dispatches them to your endpoints with guaranteed delivery, rate limiting, and comprehensive monitoring.
+
+**Perfect for:**
+- 🧪 **Local Development** - Test webhooks locally without exposing your server
+- 🏗️ **Production Infrastructure** - Reliable webhook delivery at scale
+- 🔍 **Webhook Debugging** - Comprehensive monitoring and event replay
+- 🏢 **Multi-Tenant SaaS** - Manage webhooks for multiple customers
+- 🔄 **Webhook Fan-out** - Send one webhook to multiple destinations
 
 **Key Features:**
-- ✅ **Persistent Webhook URLs** - URLs that never change (unlike ngrok)
-- ✅ **No Tunneling Required** - Your local server stays private
+- ✅ **Persistent Webhook URLs** - URLs that never change
 - ✅ **Guaranteed Delivery** - Automatic retries with exponential backoff
 - ✅ **Built-in Monitoring** - Track every webhook event with detailed metrics
 - ✅ **Rate Limiting** - Configurable events per second (EPS) at source and destination levels
-- ✅ **Production Ready** - Same endpoint works for development and production
+- ✅ **Production Ready** - Enterprise-grade reliability with 99.999% uptime
+- ✅ **Multi-Tenant Architecture** - Organizations, projects, and role-based access control
+- ✅ **Local Development** - CLI tool for forwarding webhooks to localhost (no tunneling needed)
 
 ## Installation
 
@@ -80,7 +88,11 @@ Expand-Archive -Path volley.zip -DestinationPath .
 
 The CLI will poll for new webhook events and forward them to your local endpoint in real-time.
 
-## Why Volley Instead of ngrok?
+## Volley vs Other Solutions
+
+Volley is a comprehensive webhook-as-a-service platform that competes with both local development tools and production webhook infrastructure solutions.
+
+### Volley vs ngrok (Local Development)
 
 Volley is a better alternative to ngrok for webhook testing and development:
 
@@ -122,35 +134,58 @@ Volley is a better alternative to ngrok for webhook testing and development:
 
 **Learn more:** [Why Volley Instead of ngrok?](https://docs.volleyhooks.com/use-cases/ngrok-alternative)
 
-## Comparison with Other Tools
+### Volley vs Webhook-as-a-Service Platforms
 
-### Volley vs webhook.site
+Volley competes with full webhook infrastructure platforms like Hookdeck, Svix, and others:
 
-| Feature | Volley | webhook.site |
-|---------|--------|--------------|
-| **Permanent URLs** | ✅ Yes | ❌ Temporary URLs |
-| **Local Development** | ✅ CLI forwarding | ❌ Web interface only |
-| **Monitoring** | ✅ Full dashboard | ⚠️ Basic view |
-| **Retry Mechanism** | ✅ Automatic | ❌ Manual |
-| **Production Use** | ✅ Yes | ❌ Testing only |
-| **Rate Limiting** | ✅ Configurable | ❌ Not available |
+| Feature | Volley | Hookdeck | Svix | webhook.site |
+|---------|--------|----------|------|--------------|
+| **Webhook-as-a-Service** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ Testing only |
+| **Permanent URLs** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ Temporary |
+| **Guaranteed Delivery** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No |
+| **Automatic Retries** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No |
+| **Rate Limiting** | ✅ Configurable | ✅ Yes | ✅ Yes | ❌ No |
+| **Monitoring Dashboard** | ✅ Comprehensive | ✅ Yes | ✅ Yes | ⚠️ Basic |
+| **Local Development CLI** | ✅ Yes | ⚠️ Limited | ❌ No | ❌ No |
+| **Multi-Tenant Support** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No |
+| **Event Replay** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ No |
+| **Free Tier** | ✅ 10K events/month | ⚠️ Limited | ⚠️ Limited | ✅ Yes |
+| **Pricing** | Transparent | Usage-based | Usage-based | Free only |
 
-### Volley vs RequestBin
+### Volley vs Testing Tools
 
-| Feature | Volley | RequestBin |
-|---------|--------|------------|
-| **Permanent URLs** | ✅ Yes | ❌ Temporary bins |
-| **Webhook Delivery** | ✅ Active delivery | ❌ Passive viewing |
-| **Retry Logic** | ✅ Automatic | ❌ Not available |
-| **Production Ready** | ✅ Yes | ❌ Testing only |
-| **Monitoring** | ✅ Comprehensive | ⚠️ Basic logs |
+| Feature | Volley | RequestBin | webhook.site | ngrok |
+|---------|--------|------------|--------------|-------|
+| **Permanent URLs** | ✅ Yes | ❌ Temporary | ❌ Temporary | ❌ Changes on restart |
+| **Webhook Delivery** | ✅ Active delivery | ❌ Passive viewing | ❌ Passive viewing | ✅ Tunnel |
+| **Production Ready** | ✅ Yes | ❌ Testing only | ❌ Testing only | ❌ Dev tool only |
+| **Retry Logic** | ✅ Automatic | ❌ No | ❌ No | ❌ No |
+| **Monitoring** | ✅ Comprehensive | ⚠️ Basic logs | ⚠️ Basic view | ⚠️ Limited |
+| **Local Development** | ✅ CLI forwarding | ❌ No | ❌ No | ✅ Tunnel |
+| **Tunneling Required** | ❌ No | ❌ No | ❌ No | ✅ Yes |
+| **Rate Limiting** | ✅ Configurable | ❌ No | ❌ No | ❌ No |
+
+### Why Choose Volley?
+
+**For Local Development:**
+- ✅ Better than ngrok: No tunneling, persistent URLs, built-in monitoring
+- ✅ Better than webhook.site: Active delivery, production-ready, CLI tool
+- ✅ Better than RequestBin: Permanent URLs, automatic retries, comprehensive logging
+
+**For Production:**
+- ✅ **Simpler Pricing** - Transparent pricing vs complex usage-based models
+- ✅ **Local Dev + Production** - Same platform for both, seamless transition
+- ✅ **Developer-Friendly** - CLI tool, comprehensive docs, easy setup
+- ✅ **Enterprise Features** - Multi-tenant, RBAC, rate limiting, monitoring
 
 **Use Cases:**
-- **Testing Stripe webhooks locally** - [Guide](https://docs.volleyhooks.com/use-cases/stripe-webhook-localhost)
-- **Debugging Twilio webhooks** - [Guide](https://docs.volleyhooks.com/use-cases/debug-twilio-webhooks)
-- **Webhook fan-out** - Send one webhook to multiple destinations
-- **Multi-tenant webhooks** - Manage webhooks for SaaS platforms
-- **Event replay** - Replay historical webhooks for testing
+- 🧪 **Testing Stripe webhooks locally** - [Guide](https://docs.volleyhooks.com/use-cases/stripe-webhook-localhost)
+- 🔍 **Debugging Twilio webhooks** - [Guide](https://docs.volleyhooks.com/use-cases/debug-twilio-webhooks)
+- 🔄 **Webhook fan-out** - Send one webhook to multiple destinations
+- 🏢 **Multi-tenant webhooks** - Manage webhooks for SaaS platforms
+- 📦 **Production webhook infrastructure** - Reliable delivery at scale
+- 🔁 **Event replay** - Replay historical webhooks for testing
+- 🚀 **Replacing ngrok** - Better alternative for webhook testing - [Guide](https://docs.volleyhooks.com/use-cases/ngrok-alternative)
 
 **See all use cases:** [docs.volleyhooks.com](https://docs.volleyhooks.com)
 
