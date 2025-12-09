@@ -42,8 +42,20 @@ fi
 
 # Check if tag already exists
 if git rev-parse "$VERSION" >/dev/null 2>&1; then
-  echo -e "${YELLOW}Warning: Tag $VERSION already exists${NC}"
-  read -p "Do you want to continue and rebuild? (y/N) " -n 1 -r
+  TAG_COMMIT=$(git rev-parse "$VERSION")
+  CURRENT_COMMIT=$(git rev-parse HEAD)
+  
+  if [ "$TAG_COMMIT" = "$CURRENT_COMMIT" ]; then
+    echo -e "${YELLOW}Warning: Tag $VERSION already exists and points to current commit${NC}"
+    echo -e "${YELLOW}This will rebuild binaries from the same commit${NC}"
+  else
+    echo -e "${YELLOW}Warning: Tag $VERSION already exists but points to a different commit${NC}"
+    echo -e "${YELLOW}Tag points to: $TAG_COMMIT${NC}"
+    echo -e "${YELLOW}Current HEAD:  $CURRENT_COMMIT${NC}"
+    echo -e "${RED}This will build from the OLD commit, not your current changes!${NC}"
+  fi
+  
+  read -p "Do you want to continue and rebuild from the existing tag? (y/N) " -n 1 -r
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
@@ -90,14 +102,44 @@ if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
   git tag -a "$VERSION" -m "Release $VERSION"
   echo -e "${GREEN}Tag created${NC}"
 else
-  echo -e "${YELLOW}Tag already exists, skipping creation${NC}"
+  TAG_COMMIT=$(git rev-parse "$VERSION")
+  CURRENT_COMMIT=$(git rev-parse HEAD)
+  
+  if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
+    echo -e "${YELLOW}Tag already exists but points to different commit${NC}"
+    read -p "Do you want to force-update the tag to current commit? (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      git tag -d "$VERSION" 2>/dev/null || true
+      git tag -a "$VERSION" -m "Release $VERSION"
+      echo -e "${GREEN}Tag force-updated to current commit${NC}"
+    else
+      echo -e "${YELLOW}Keeping existing tag, will build from old commit${NC}"
+    fi
+  else
+    echo -e "${YELLOW}Tag already exists and points to current commit, skipping creation${NC}"
+  fi
 fi
 
 # Push tag
 echo -e "${GREEN}Pushing tag to remote...${NC}"
-git push origin "$VERSION" || {
-  echo -e "${YELLOW}Tag push failed or tag already exists on remote${NC}"
-}
+if git push origin "$VERSION" 2>/dev/null; then
+  echo -e "${GREEN}Tag pushed successfully${NC}"
+else
+  # Tag might already exist on remote
+  echo -e "${YELLOW}Tag push failed - tag may already exist on remote${NC}"
+  read -p "Do you want to force-push the tag? (y/N) " -n 1 -r
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    git push origin "$VERSION" --force || {
+      echo -e "${RED}Force push failed${NC}"
+      exit 1
+    }
+    echo -e "${GREEN}Tag force-pushed successfully${NC}"
+  else
+    echo -e "${YELLOW}Continuing with local tag only${NC}"
+  fi
+fi
 
 # Step 3: Checkout tag
 echo ""

@@ -69,35 +69,43 @@ func runListen(cmd *cobra.Command, args []string) error {
 	source := sourceWithProject.Source
 	projectID := sourceWithProject.ProjectID
 
-	// Get connections for this source to find which connection to monitor
+	// Get connections for this source to determine which mode to use
 	connections, err := apiClient.GetConnectionsBySource(source.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get connections: %w", err)
 	}
 
-	if len(connections) == 0 {
-		return fmt.Errorf("no connections found for source '%s'. Please create a connection first", sourceID)
+	// Record when we started listening - only forward events created after this
+	startTime := time.Now()
+	
+	// Determine mode: use connection-based polling if connections exist, otherwise direct event polling
+	useConnectionMode := len(connections) > 0
+	var connectionID uint64
+	if useConnectionMode {
+		connectionID = connections[0].ID
+		fmt.Printf("Ready! Forwarding webhooks from source '%s' to %s\n", sourceID, forwardURL)
+		fmt.Printf("Source: %s (ID: %d)\n", source.Slug, source.ID)
+		fmt.Printf("Connection: %s (ID: %d)\n", connections[0].Name, connectionID)
+	} else {
+		fmt.Printf("Ready! Forwarding webhooks from source '%s' to %s\n", sourceID, forwardURL)
+		fmt.Printf("Source: %s (ID: %d)\n", source.Slug, source.ID)
+		fmt.Printf("Mode: Direct event polling (no connection required)\n")
 	}
-
-	// Use the first enabled connection, or create a temporary one
-	connectionID := connections[0].ID
-
-	fmt.Printf("Ready! Forwarding webhooks from source '%s' to %s\n", sourceID, forwardURL)
-	fmt.Printf("Source: %s (ID: %d)\n", source.Slug, source.ID)
-	fmt.Printf("Connection: %s (ID: %d)\n", connections[0].Name, connectionID)
 	fmt.Println("Press Ctrl+C to stop")
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	// Record when we started listening - only forward events created after this
-	startTime := time.Now()
 	// Track forwarded event IDs to avoid duplicates
 	forwardedEventIDs := make(map[string]bool)
+	
+	// Adaptive polling: start with 2s, increase to 5s if no events found (optimization)
 	pollInterval := 2 * time.Second
+	noEventsCount := 0
+	const maxNoEventsBeforeSlowdown = 10 // Slow down after 10 polls with no events
 
-	// Poll for new delivery attempts
+	// Poll for new events
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
@@ -107,83 +115,172 @@ func runListen(cmd *cobra.Command, args []string) error {
 			fmt.Println("\n✓ Shutting down...")
 			return nil
 		case <-ticker.C:
-			// Get recent delivery attempts for this connection
-			attempts, err := apiClient.GetDeliveryAttempts(connectionID, 20)
+			var eventsProcessed int
+			var err error
+			
+			if useConnectionMode {
+				// Mode 1: Connection-based polling (backward compatible)
+				eventsProcessed, err = pollConnectionMode(apiClient, connectionID, projectID, startTime, forwardedEventIDs, forwardURL)
+			} else {
+				// Mode 2: Direct event polling (new, simplified flow)
+				eventsProcessed, err = pollDirectEventMode(apiClient, projectID, source.ID, startTime, forwardedEventIDs, forwardURL)
+			}
+			
 			if err != nil {
 				if viper.GetBool("verbose") {
-					fmt.Fprintf(os.Stderr, "Warning: failed to get delivery attempts: %v\n", err)
+					fmt.Fprintf(os.Stderr, "Warning: polling error: %v\n", err)
 				}
+				// Continue polling even on errors
 				continue
 			}
-
-			// Filter attempts: only process those created after we started and haven't forwarded yet
-			for i := len(attempts) - 1; i >= 0; i-- {
-				attempt := attempts[i]
-
-				// Skip if we've already processed this event
-				if forwardedEventIDs[attempt.EventID] {
-					continue
+			
+			// Adaptive polling optimization: slow down if no events
+			if eventsProcessed > 0 {
+				noEventsCount = 0
+				// Reset to fast polling if we found events
+				if pollInterval > 2*time.Second {
+					ticker.Stop()
+					pollInterval = 2 * time.Second
+					ticker = time.NewTicker(pollInterval)
 				}
-
-				// Check if this attempt is new (created after we started)
-				if attempt.CreatedAt == "" {
-					// No timestamp - skip it to be safe
-					forwardedEventIDs[attempt.EventID] = true
-					continue
-				}
-
-				createdAt, err := time.Parse(time.RFC3339, attempt.CreatedAt)
-				if err != nil {
-					// Can't parse timestamp - skip it
-					forwardedEventIDs[attempt.EventID] = true
+			} else {
+				noEventsCount++
+				// Slow down polling if no events for a while (save API calls)
+				if noEventsCount >= maxNoEventsBeforeSlowdown && pollInterval < 5*time.Second {
+					ticker.Stop()
+					pollInterval = 5 * time.Second
+					ticker = time.NewTicker(pollInterval)
 					if viper.GetBool("verbose") {
-						fmt.Fprintf(os.Stderr, "Warning: failed to parse timestamp for event %s: %v\n", attempt.EventID, err)
+						fmt.Fprintf(os.Stderr, "No events detected, slowing polling to %v\n", pollInterval)
 					}
-					continue
-				}
-
-				// Skip old events (created before we started listening)
-				if !createdAt.After(startTime) {
-					forwardedEventIDs[attempt.EventID] = true
-					continue
-				}
-
-				// Mark as processed immediately to avoid duplicates
-				forwardedEventIDs[attempt.EventID] = true
-
-				// Query event directly by event_id with retries
-				// New events might take a moment to be indexed
-				var event *api.Event
-				maxRetries := 5
-				for retry := 0; retry < maxRetries; retry++ {
-					event, err = apiClient.GetEvent(attempt.EventID, projectID)
-					if err == nil {
-						break
-					}
-					// If event not found, wait longer and retry (might not be indexed yet)
-					if retry < maxRetries-1 {
-						// Exponential backoff: 1s, 2s, 3s, 4s
-						delay := time.Duration(retry+1) * time.Second
-						time.Sleep(delay)
-					}
-				}
-				
-				if err != nil {
-					if viper.GetBool("verbose") {
-						fmt.Fprintf(os.Stderr, "Warning: failed to get event %s after %d retries: %v\n", attempt.EventID, maxRetries, err)
-					}
-					continue
-				}
-
-				// Forward to local endpoint
-				if err := forwardEvent(event, forwardURL); err != nil {
-					fmt.Fprintf(os.Stderr, "✗ Failed to forward event %s: %v\n", attempt.EventID, err)
-				} else {
-					fmt.Printf("✓ Forwarded event %s -> %s\n", attempt.EventID, forwardURL)
 				}
 			}
 		}
 	}
+}
+
+// pollConnectionMode polls using delivery attempts (backward compatible mode)
+func pollConnectionMode(apiClient *api.Client, connectionID uint64, projectID uint64, startTime time.Time, forwardedEventIDs map[string]bool, forwardURL string) (int, error) {
+	// Get recent delivery attempts for this connection
+	attempts, err := apiClient.GetDeliveryAttempts(connectionID, 20)
+	if err != nil {
+		return 0, err
+	}
+
+	eventsProcessed := 0
+
+	// Filter attempts: only process those created after we started and haven't forwarded yet
+	for i := len(attempts) - 1; i >= 0; i-- {
+		attempt := attempts[i]
+
+		// Skip if we've already processed this event
+		if forwardedEventIDs[attempt.EventID] {
+			continue
+		}
+
+		// Check if this attempt is new (created after we started)
+		if attempt.CreatedAt == "" {
+			// No timestamp - skip it to be safe
+			forwardedEventIDs[attempt.EventID] = true
+			continue
+		}
+
+		createdAt, err := time.Parse(time.RFC3339, attempt.CreatedAt)
+		if err != nil {
+			// Can't parse timestamp - skip it
+			forwardedEventIDs[attempt.EventID] = true
+			if viper.GetBool("verbose") {
+				fmt.Fprintf(os.Stderr, "Warning: failed to parse timestamp for event %s: %v\n", attempt.EventID, err)
+			}
+			continue
+		}
+
+		// Skip old events (created before we started listening)
+		if !createdAt.After(startTime) {
+			forwardedEventIDs[attempt.EventID] = true
+			continue
+		}
+
+		// Mark as processed immediately to avoid duplicates
+		forwardedEventIDs[attempt.EventID] = true
+
+		// Query event directly by event_id with retries
+		// New events might take a moment to be indexed
+		var event *api.Event
+		maxRetries := 5
+		for retry := 0; retry < maxRetries; retry++ {
+			event, err = apiClient.GetEvent(attempt.EventID, projectID)
+			if err == nil {
+				break
+			}
+			// If event not found, wait longer and retry (might not be indexed yet)
+			if retry < maxRetries-1 {
+				// Exponential backoff: 1s, 2s, 3s, 4s
+				delay := time.Duration(retry+1) * time.Second
+				time.Sleep(delay)
+			}
+		}
+		
+		if err != nil {
+			if viper.GetBool("verbose") {
+				fmt.Fprintf(os.Stderr, "Warning: failed to get event %s after %d retries: %v\n", attempt.EventID, maxRetries, err)
+			}
+			continue
+		}
+
+		// Forward to local endpoint
+		if err := forwardEvent(event, forwardURL); err != nil {
+			fmt.Fprintf(os.Stderr, "✗ Failed to forward event %s: %v\n", attempt.EventID, err)
+		} else {
+			fmt.Printf("✓ Forwarded event %s -> %s\n", attempt.EventID, forwardURL)
+			eventsProcessed++
+		}
+	}
+
+	return eventsProcessed, nil
+}
+
+// pollDirectEventMode polls events directly from source (simplified mode, no connection required)
+// CRITICAL: Events are forwarded with exact headers and raw body to preserve webhook signature validation
+func pollDirectEventMode(apiClient *api.Client, projectID uint64, sourceID uint64, startTime time.Time, forwardedEventIDs map[string]bool, forwardURL string) (int, error) {
+	// Use optimized API call with source_id and start_time filtering (server-side filtering is more efficient)
+	events, err := apiClient.GetEventsBySource(projectID, sourceID, 50, &startTime)
+	if err != nil {
+		return 0, err
+	}
+
+	eventsProcessed := 0
+
+	// Process events in reverse order (newest first)
+	for i := len(events) - 1; i >= 0; i-- {
+		event := events[i]
+
+		// Skip if we've already processed this event
+		if forwardedEventIDs[event.EventID] {
+			continue
+		}
+
+		// Double-check timestamp (server-side filtering should handle this, but be safe)
+		if !event.CreatedAt.After(startTime) {
+			forwardedEventIDs[event.EventID] = true
+			continue
+		}
+
+		// Mark as processed immediately to avoid duplicates
+		forwardedEventIDs[event.EventID] = true
+
+		// Forward to local endpoint
+		// Note: No retries needed here since events are already in DB (more efficient than connection mode)
+		// The forwardEvent function preserves exact headers and raw body for signature validation
+		if err := forwardEvent(&event, forwardURL); err != nil {
+			fmt.Fprintf(os.Stderr, "✗ Failed to forward event %s: %v\n", event.EventID, err)
+		} else {
+			fmt.Printf("✓ Forwarded event %s -> %s\n", event.EventID, forwardURL)
+			eventsProcessed++
+		}
+	}
+
+	return eventsProcessed, nil
 }
 
 func forwardEvent(event *api.Event, targetURL string) error {
