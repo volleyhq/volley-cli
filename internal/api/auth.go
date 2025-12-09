@@ -29,12 +29,16 @@ type CLIAuthPollResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 
+type GetUserResponse struct {
+	User User `json:"user"`
+}
+
 func (c *Client) GetUser() (*User, error) {
-	var user User
-	if err := c.doJSONRequest("GET", "/api/user", nil, &user); err != nil {
+	var resp GetUserResponse
+	if err := c.doJSONRequest("GET", "/api/user", nil, &resp); err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return &resp.User, nil
 }
 
 func (c *Client) GetOrganization() (*Organization, error) {
