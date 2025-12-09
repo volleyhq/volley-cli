@@ -176,4 +176,3 @@ echo "  1. Review the changes: git diff $FORMULA_FILE"
 echo "  2. Commit: git add $FORMULA_FILE && git commit -m 'Update formula for $VERSION'"
 echo "  3. Create tag: git tag -a $VERSION -m 'Release $VERSION'"
 echo "  4. Push: git push origin main && git push origin $VERSION"
-

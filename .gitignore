@@ -25,6 +25,9 @@ Thumbs.db
 # Config (local)
 config.json
 
+# Backup files
+*.backup.*
+
 # Internal documentation
 HOMEBREW_SETUP.md
 RELEASE.md

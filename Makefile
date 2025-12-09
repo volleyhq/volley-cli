@@ -1,7 +1,8 @@
 .PHONY: build install test clean release help
 
 # Version info
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+# For releases, use --exact-match to ensure we're on a tag, otherwise use describe without --dirty
+VERSION ?= $(shell git describe --exact-match --tags 2>/dev/null || git describe --tags --always 2>/dev/null || echo "dev")
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
