@@ -86,6 +86,8 @@ Expand-Archive -Path volley.zip -DestinationPath .
    volley listen --source abc123xyz --forward-to http://localhost:3000/webhook
    ```
 
+   **That's it!** No connection or destination setup required. The CLI will automatically forward events from your source to localhost.
+
 The CLI will poll for new webhook events and forward them to your local endpoint in real-time.
 
 ## Volley vs Other Solutions
@@ -218,6 +220,7 @@ This will:
 ### Testing Stripe Webhooks Locally
 
 1. **Create a Stripe webhook source in Volley dashboard**
+   - No connection or destination needed for localhost testing!
 2. **Get your permanent webhook URL**: `https://api.volleyhooks.com/hook/abc123xyz`
 3. **Add this URL to Stripe Dashboard** → Webhooks → Add endpoint
 4. **Start forwarding to your local server:**
@@ -225,6 +228,8 @@ This will:
    volley listen --source abc123xyz --forward-to http://localhost:3000/webhook
    ```
 5. **Trigger test events in Stripe** - They'll be forwarded to your local server instantly!
+
+**Note:** The CLI automatically handles events even if you haven't created a connection yet. Just create a source and start forwarding!
 
 **Full guide:** [Testing Stripe Webhooks Locally](https://docs.volleyhooks.com/use-cases/stripe-webhook-localhost)
 
@@ -245,13 +250,19 @@ volley listen --source abc123xyz --forward-to http://localhost:3002/log
 
 ## How It Works
 
-The CLI:
+The CLI uses a smart hybrid approach:
 1. Authenticates with your Volley account
 2. Finds the source by ingestion ID
-3. Gets the connections for that source
-4. Polls the API for new delivery attempts
-5. Retrieves the full event payload
-6. Forwards it to your local endpoint with original headers
+3. **If connections exist:** Uses connection-based polling (backward compatible)
+4. **If no connections exist:** Polls events directly from the source (simplified flow)
+5. Retrieves the full event payload with original headers
+6. Forwards it to your local endpoint, preserving exact headers and body for signature validation
+
+**Key Benefits:**
+- ✅ **No connection required** - Just create a source and start forwarding
+- ✅ **Simplified setup** - Perfect for localhost testing
+- ✅ **Backward compatible** - Works with existing connections too
+- ✅ **Preserves signatures** - Headers and payload are forwarded exactly as received
 
 ## Configuration
 

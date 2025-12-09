@@ -67,9 +67,9 @@ This should show:
 - Your email and user details
 - Current organization (if you have one)
 
-### 3. Create a Test Source and Connection
+### 3. Create a Test Source
 
-Before testing the `listen` command, you need:
+**Simplified Setup:** You only need to create a source - no connection required for localhost testing!
 
 1. **Create an organization** (if you don't have one):
    - Use the console UI at `http://localhost:5173/console`
@@ -89,23 +89,20 @@ Before testing the `listen` command, you need:
      -d '{"name": "Test Project"}'
    ```
 
-3. **Create a source and connection**:
+3. **Create a source** (connection not required):
    ```bash
-   curl -X POST http://localhost:8080/api/projects/1/connections \
+   curl -X POST http://localhost:8080/api/projects/1/sources \
      -H "Authorization: Bearer YOUR_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
-       "name": "Test Connection",
-       "source_name": "test-source",
-       "source_eps": 10,
-       "destination_name": "Local Test",
-       "destination_url": "http://localhost:3000/webhook",
-       "destination_eps": 5,
-       "status": "enabled"
+       "slug": "test-source",
+       "eps": 10
      }'
    ```
 
    Note the `ingestion_id` from the response - you'll need it for the listen command.
+
+   **That's it!** You can now use the CLI to forward events to localhost without creating a connection.
 
 ### 4. Set Up a Local Webhook Receiver
 
@@ -218,8 +215,9 @@ cat ~/.config/volley/config.json
    - Make sure the source exists in your local database
 
 3. **"no connections found" error**:
-   - Make sure you've created a connection for the source
-   - Check the connection status is "enabled"
+   - This error no longer appears! The CLI now works without connections
+   - If you see this, you may be using an older version - update to the latest
+   - The CLI automatically uses direct event polling when no connections exist
 
 4. **Webhooks not forwarding**:
    - Check your local receiver is running

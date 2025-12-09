@@ -46,19 +46,38 @@ if git rev-parse "$VERSION" >/dev/null 2>&1; then
   CURRENT_COMMIT=$(git rev-parse HEAD)
   
   if [ "$TAG_COMMIT" = "$CURRENT_COMMIT" ]; then
-    echo -e "${YELLOW}Warning: Tag $VERSION already exists and points to current commit${NC}"
+    echo -e "${YELLOW}Info: Tag $VERSION already exists and points to current commit${NC}"
     echo -e "${YELLOW}This will rebuild binaries from the same commit${NC}"
+    echo ""
   else
-    echo -e "${YELLOW}Warning: Tag $VERSION already exists but points to a different commit${NC}"
-    echo -e "${YELLOW}Tag points to: $TAG_COMMIT${NC}"
-    echo -e "${YELLOW}Current HEAD:  $CURRENT_COMMIT${NC}"
-    echo -e "${RED}This will build from the OLD commit, not your current changes!${NC}"
-  fi
-  
-  read -p "Do you want to continue and rebuild from the existing tag? (y/N) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    exit 1
+    echo -e "${YELLOW}⚠️  Tag $VERSION already exists but points to a different commit${NC}"
+    echo -e "${YELLOW}   Tag points to: $TAG_COMMIT${NC}"
+    echo -e "${YELLOW}   Current HEAD:  $CURRENT_COMMIT${NC}"
+    echo ""
+    echo -e "${GREEN}Options:${NC}"
+    echo -e "  ${GREEN}1)${NC} Update tag to current commit (recommended - releases your new changes)"
+    echo -e "  ${GREEN}2)${NC} Build from old commit (not recommended - ignores your changes)"
+    echo -e "  ${GREEN}3)${NC} Cancel and exit"
+    echo ""
+    read -p "Choose option (1/2/3) [default: 1]: " -n 1 -r
+    echo
+    case $REPLY in
+      2)
+        echo -e "${YELLOW}Continuing with existing tag (will build from old commit)${NC}"
+        ;;
+      3|"")
+        echo -e "${YELLOW}Cancelled${NC}"
+        exit 1
+        ;;
+      *)
+        # Option 1 or any other input - update the tag
+        echo -e "${GREEN}Updating tag to current commit...${NC}"
+        git tag -d "$VERSION" 2>/dev/null || true
+        git tag -a "$VERSION" -m "Release $VERSION"
+        echo -e "${GREEN}✓ Tag updated to current commit${NC}"
+        FORCE_UPDATE_TAG=true
+        ;;
+    esac
   fi
 fi
 
@@ -105,17 +124,13 @@ else
   TAG_COMMIT=$(git rev-parse "$VERSION")
   CURRENT_COMMIT=$(git rev-parse HEAD)
   
-  if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
-    echo -e "${YELLOW}Tag already exists but points to different commit${NC}"
-    read -p "Do you want to force-update the tag to current commit? (y/N) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-      git tag -d "$VERSION" 2>/dev/null || true
-      git tag -a "$VERSION" -m "Release $VERSION"
-      echo -e "${GREEN}Tag force-updated to current commit${NC}"
-    else
-      echo -e "${YELLOW}Keeping existing tag, will build from old commit${NC}"
-    fi
+  if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ] && [ "$FORCE_UPDATE_TAG" != "true" ]; then
+    # Tag was not updated in initial check, but user chose option 2 (build from old)
+    echo -e "${YELLOW}Tag already exists and points to different commit${NC}"
+    echo -e "${YELLOW}Building from existing tag (old commit)${NC}"
+  elif [ "$FORCE_UPDATE_TAG" = "true" ]; then
+    # Tag was already updated in initial check
+    echo -e "${GREEN}Tag already updated to current commit${NC}"
   else
     echo -e "${YELLOW}Tag already exists and points to current commit, skipping creation${NC}"
   fi
@@ -127,17 +142,27 @@ if git push origin "$VERSION" 2>/dev/null; then
   echo -e "${GREEN}Tag pushed successfully${NC}"
 else
   # Tag might already exist on remote
-  echo -e "${YELLOW}Tag push failed - tag may already exist on remote${NC}"
-  read -p "Do you want to force-push the tag? (y/N) " -n 1 -r
-  echo
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
+  if [ "$FORCE_UPDATE_TAG" = "true" ]; then
+    # Tag was updated locally, need to force-push
+    echo -e "${YELLOW}Tag was updated locally, force-pushing to remote...${NC}"
     git push origin "$VERSION" --force || {
       echo -e "${RED}Force push failed${NC}"
       exit 1
     }
     echo -e "${GREEN}Tag force-pushed successfully${NC}"
   else
-    echo -e "${YELLOW}Continuing with local tag only${NC}"
+    echo -e "${YELLOW}Tag push failed - tag may already exist on remote${NC}"
+    read -p "Do you want to force-push the tag? (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      git push origin "$VERSION" --force || {
+        echo -e "${RED}Force push failed${NC}"
+        exit 1
+      }
+      echo -e "${GREEN}Tag force-pushed successfully${NC}"
+    else
+      echo -e "${YELLOW}Continuing with local tag only${NC}"
+    fi
   fi
 fi
 
@@ -189,18 +214,59 @@ echo -e "${GREEN}All binaries built successfully${NC}"
 # Step 5: Verify version in binaries
 echo ""
 echo -e "${GREEN}[5/10] Verifying version in binaries...${NC}"
-BINARY_VERSION=$("$BUILD_DIR/volley-darwin-amd64" --version 2>/dev/null | awk '{print $3}' || echo "")
-if [[ "$BINARY_VERSION" == *"-dirty"* ]]; then
+
+# Detect platform and try to find a binary we can run
+BINARY_TO_TEST=""
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # On macOS, try arm64 first (M1/M2 Macs), then amd64
+  if [[ $(uname -m) == "arm64" ]]; then
+    BINARY_TO_TEST="$BUILD_DIR/volley-darwin-arm64"
+  else
+    BINARY_TO_TEST="$BUILD_DIR/volley-darwin-amd64"
+  fi
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+  # On Linux, try to detect architecture
+  if [[ $(uname -m) == "aarch64" ]] || [[ $(uname -m) == "arm64" ]]; then
+    BINARY_TO_TEST="$BUILD_DIR/volley-linux-arm64"
+  else
+    BINARY_TO_TEST="$BUILD_DIR/volley-linux-amd64"
+  fi
+else
+  # Fallback: try darwin-arm64 (most common for development)
+  BINARY_TO_TEST="$BUILD_DIR/volley-darwin-arm64"
+fi
+
+# Try to get version from the binary
+BINARY_VERSION=""
+if [ -f "$BINARY_TO_TEST" ]; then
+  BINARY_VERSION=$("$BINARY_TO_TEST" --version 2>/dev/null | awk '{print $3}' || echo "")
+fi
+
+# If that failed, try other binaries
+if [ -z "$BINARY_VERSION" ]; then
+  for binary in "$BUILD_DIR/volley-darwin-arm64" "$BUILD_DIR/volley-darwin-amd64" "$BUILD_DIR/volley-linux-amd64" "$BUILD_DIR/volley-linux-arm64"; do
+    if [ -f "$binary" ]; then
+      BINARY_VERSION=$("$binary" --version 2>/dev/null | awk '{print $3}' || echo "")
+      if [ -n "$BINARY_VERSION" ]; then
+        break
+      fi
+    fi
+  done
+fi
+
+if [ -z "$BINARY_VERSION" ]; then
+  echo -e "${RED}Error: Could not extract version from any binary${NC}"
+  echo -e "${YELLOW}This might happen if binaries are for a different platform${NC}"
+  echo -e "${YELLOW}Continuing anyway - please verify version manually${NC}"
+elif [[ "$BINARY_VERSION" == *"-dirty"* ]]; then
   echo -e "${RED}Error: Binary version contains '-dirty' suffix: $BINARY_VERSION${NC}"
   exit 1
-fi
-
-if [[ "$BINARY_VERSION" != "$VERSION"* ]]; then
+elif [[ "$BINARY_VERSION" != "$VERSION"* ]]; then
   echo -e "${RED}Error: Binary version mismatch. Expected: $VERSION, Got: $BINARY_VERSION${NC}"
   exit 1
+else
+  echo -e "${GREEN}Version verified: $BINARY_VERSION${NC}"
 fi
-
-echo -e "${GREEN}Version verified: $BINARY_VERSION${NC}"
 
 # Step 6: Calculate SHA256 hashes and update formula
 echo ""
