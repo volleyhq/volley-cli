@@ -85,7 +85,7 @@ func runListen(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Ready! Forwarding webhooks from source '%s' to %s\n", sourceID, forwardURL)
 	fmt.Printf("Source: %s (ID: %d)\n", source.Slug, source.ID)
 	fmt.Printf("Connection: %s (ID: %d)\n", connections[0].Name, connectionID)
-	fmt.Println("Press Ctrl+C to stop\n")
+	fmt.Println("Press Ctrl+C to stop")
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
